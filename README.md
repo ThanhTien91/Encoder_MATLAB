@@ -1,49 +1,52 @@
-# ⚙️ Bộ ước lượng vị trí và vận tốc từ encoder quadrature có mất xung
+# ⚙️ Đồ án: Bộ ước lượng vị trí và vận tốc từ encoder quadrature có mất xung
 
 [![MATLAB](https://img.shields.io/badge/MATLAB-2023a%2B-blue.svg)](https://www.mathworks.com/)
-[![Status](https://img.shields.io/badge/Trạng_thái-Ngày_1%2F10-orange.svg)]()
+[![Status](https://img.shields.io/badge/Tiến_độ-Ngày_2%2F10-orange.svg)]()
 
-Đồ án phát triển thuật toán giải mã và ước lượng trạng thái (vị trí, vận tốc) từ tín hiệu Quadrature Encoder loại tăng (Incremental Encoder). Dự án tập trung vào việc mô phỏng phần cứng, xử lý nhiễu ngẫu nhiên và khôi phục dữ liệu khi xảy ra hiện tượng mất xung.
+Repository này chứa mã nguồn MATLAB mô phỏng và xử lý tín hiệu cho Quadrature Encoder. Mục tiêu của dự án là thiết lập mô hình vật lý có chứa nhiễu, từ đó xây dựng và kiểm chứng các thuật toán giải mã, ước lượng tốc độ và khôi phục tín hiệu khi bị mất xung ngẫu nhiên.
 
 ---
 
-## 📂 Cấu trúc thư mục (Repository Structure)
-
-Dự án được tổ chức theo chuẩn kiến trúc phần mềm MATLAB để đảm bảo tính module và dễ dàng tái sử dụng:
+## 📂 Cấu trúc thư mục
 
 ```text
 📦 Encoder_Project
- ┣ 📂 config           # Thông số hệ thống (default_params.m)
- ┣ 📂 models           # Mô hình động học và sinh tín hiệu encoder (trajectory_model.m, encoder_model.m)
- ┣ 📜 main_day1.m      # Script chạy chính kiểm tra mô phỏng Ngày 1
- ┗ 📜 README.md        # File mô tả dự án
+ ┣ 📂 config           # File cấu hình tham số hệ thống (default_params.m)
+ ┣ 📂 models           # Mô hình động học, sinh tín hiệu và chèn nhiễu
+ ┣ 📂 results          # Lưu trữ hình ảnh và số liệu xuất ra (thư mục figures/)
+ ┣ 📜 main_day1.m      # Script chạy nghiệm thu Ngày 1 (Hệ lý tưởng)
+ ┣ 📜 main_day2.m      # Script chạy nghiệm thu Ngày 2 (Hệ có nhiễu)
+ ┗ 📜 README.md        # Thông tin đồ án
+
 ```
 
 ---
 
-## 🚀 Hướng dẫn bắt đầu (Quick Start)
+## 🚀 Hướng dẫn chạy code
 
-### Khởi chạy Ngày 1
-Ngày 1 tập trung vào việc thiết lập các thông số cơ bản và xây dựng mô hình sinh quỹ đạo (Trajectory Model) và mô hình tạo tín hiệu từ Encoder (Encoder Model).
+**1. Nghiệm thu Ngày 1 (Hệ thống lý tưởng):**
+Chạy script `main_day1.m`. File này sẽ sinh quỹ đạo chuyển động (tăng tốc, đảo chiều, dừng) và xuất ra tín hiệu A, B, Z lệch pha 90 độ điện hoàn hảo.
 
-1. Clone repository này về máy:
-   ```bash
-   git clone <your-repo-url>
-   ```
-2. Mở MATLAB, điều hướng đến thư mục dự án `Encoder_Project`.
-3. Chạy file `main_day1.m` để xem kết quả mô phỏng:
-   ```matlab
-   >> main_day1
-   ```
+**2. Nghiệm thu Ngày 2 (Tiêm lỗi phần cứng):**
+Chạy script `main_day2.m`. File này lấy dữ liệu từ Ngày 1 và đưa thêm nhiễu vào.
+
+* Theo dõi Command Window để xem số lượng xung bị đánh rớt.
+* Dùng công cụ Zoom trên đồ thị để xem sự sai lệch pha, rung thời gian (jitter), dội xung (bounce) và các điểm tín hiệu bị mất hoàn toàn.
 
 ---
 
-## 🧮 Cấu trúc Code Ngày 1
+## 🧮 Cập nhật tiến độ & Kết quả
 
-*   **`config/default_params.m`**: Định nghĩa thông số gốc của hệ thống (PPR = 1000, Fs = 1MHz, Max RPM = 600).
-*   **`models/trajectory_model.m`**: Sinh quỹ đạo vận tốc và vị trí chuẩn của động cơ.
-*   **`models/encoder_model.m`**: Chuyển đổi vị trí cơ học sang tín hiệu điện (sóng vuông A, B, Z lệch pha 90 độ).
-*   **`main_day1.m`**: Script điều phối gọi các hàm mô hình, hiển thị đồ thị quỹ đạo và sóng vuông thực tế.
+### Ngày 1: Mô hình toán học & Tín hiệu chuẩn
+
+* **Thông số:** Thiết lập tần số lấy mẫu 1 MHz, độ phân giải 1000 PPR, tốc độ tối đa 600 RPM.
+* **Kết quả:** Hoàn thiện `trajectory_model.m` (quỹ đạo 5 pha) và `encoder_model.m`. Tín hiệu đầu ra lý tưởng, đúng biên độ và quan hệ pha.
+
+### Ngày 2: Mô phỏng nhiễu và lỗi phần cứng
+
+* **Thông số chèn lỗi:** Rớt xung ngẫu nhiên tỷ lệ 1%, lệch pha tĩnh 5 mẫu, nhiễu Jitter ±2 mẫu, và nhiễu dội xung (Bounce) với xác suất 25%.
+* **Kết quả:** Hoàn thiện `inject_micro_noise.m` và `inject_pulse_loss.m`. Thuật toán giả lập thành công các gai nhiễu phần cứng và hiện tượng mất xung (đánh rớt 130/13000 xung vật lý). Đồ thị phản ánh đúng sự biến dạng tín hiệu ở mức vi mô.
 
 ---
-*Dự án đang trong quá trình phát triển (Lộ trình 10 ngày).*
+
+*Lộ trình phát triển dự kiến: 10 ngày.*
