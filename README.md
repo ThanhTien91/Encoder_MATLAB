@@ -20,11 +20,11 @@ Repository này chứa mã nguồn MATLAB mô phỏng và xử lý tín hiệu c
  ┣ 📜 main_day2.m         # Script chạy nghiệm thu Ngày 2 (Hệ có nhiễu)
  ┣ 📜 main_day3.m         # Script chạy nghiệm thu Ngày 3 (Giải mã & Ước lượng)
  ┣ 📜 main_day4.m         # Script chạy nghiệm thu Ngày 4 (Bù trừ lỗi & Lọc IIR)
+ ┣ 📜 main_day7.m         # Script chạy nghiệm thu Ngày 7 (Kịch bản thử nghiệm động học)
  ┣ 📜 verify_manual.m     # Script kiểm chứng chéo toán học (Sanity Check)
  ┣ 📜 run_sensitivity.m   # Script phân tích độ nhạy (Sensitivity Analysis)
  ┣ 📜 .gitignore          # Cấu hình bỏ qua file rác MATLAB
  ┗ 📜 README.md           # Thông tin đồ án
-
 ```
 
 ---
@@ -83,12 +83,10 @@ Repository này chứa mã nguồn MATLAB mô phỏng và xử lý tín hiệu c
 * **Ngày 3 (Giải mã & Ước lượng):** Phát triển State Machine bắt thành công các sự kiện nhảy trạng thái kép. Hoàn thiện thuật toán Hybrid Estimator (Adaptive Fusion) khắc phục triệt để điểm yếu của cả M-Method và T-Method.
 * **Ngày 4 & 5 (Bù trừ vị trí & Chốt bộ lọc vận tốc):** Áp dụng State-Transition Compensation và bộ lọc IIR (`alpha = 0.15`). Thuật toán Compensation cải thiện >20% sai số vị trí. Chốt hạ IIR sau khi chứng minh ước lượng Kalman bị trễ pha. Xác định được điểm gục ngã của hệ thống ở ngưỡng mất xung 1.0%.
 
-### 🟡 Giai đoạn 2: Kiểm chứng và Đóng gói (Kế hoạch sắp tới)
-
 ### 🟡 Giai đoạn 2: Kiểm chứng và Đóng gói (Đang thực hiện)
 
 * **🟢 Ngày 6 (Kiểm chứng mô hình - Verification):** Đã hoàn thành Manual Verification (Sanity Check) tính tay. Nền tảng toán học cốt lõi đạt sai số tuyệt đối `0.00e+00` ở cả vị trí và vận tốc.
-* **Ngày 7 (Kịch bản thử nghiệm - Scenario Testing):** Thiết kế và chạy tối thiểu 5 kịch bản khác nhau bao gồm: tăng tốc nhanh, vùng tốc độ rất thấp, và đảo chiều quay (zero-crossing) để đánh giá hành vi của hệ thống.
+* **🟢 Ngày 7 (Kịch bản thử nghiệm - Scenario Testing):** Đã hoàn thành đánh giá định lượng 5 kịch bản động học khắc nghiệt (vận tốc thấp, zero-crossing, phanh gấp, tăng tốc nhanh). Bộ ước lượng Hybrid hoạt động ổn định với độ trễ tối đa chỉ 3.49 ms. Cơ chế Timeout xử lý thành công hiện tượng kẹt trạng thái.
 * **Ngày 8 (Phân tích tính bất định - Uncertainty Analysis):** Chạy Uncertainty / Sensitivity Analysis bằng phương pháp Monte Carlo để đánh giá sai số theo biên độ nhiễu và tỷ lệ mất xung.
 * **Ngày 9 (Tổng hợp Dữ liệu):** Tổng hợp các metric định lượng (RMSE, MAE, Delay) để chứng minh tính đúng đắn của toàn bộ pipeline qua các kịch bản thử nghiệm.
 * **Ngày 10 (Nghiệm thu cuối):** Xuất toàn bộ biểu đồ vector chất lượng cao, hoàn thiện tài liệu báo cáo kỹ thuật (Technical Report) và slide bảo vệ đồ án.
