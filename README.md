@@ -69,17 +69,25 @@ Repository này chứa mã nguồn MATLAB mô phỏng và xử lý tín hiệu c
 
 * **Velocity Filtering:** Thực hiện kiểm chứng độc lập để chọn ra bộ lọc tối ưu nhất. Kết quả cho thấy IIR Filter (`alpha = 0.15`) đạt RMSE 2.73 rad/s và độ trễ 5.01 ms, vượt trội hơn so với 1D Kalman Filter (RMSE 3.41 rad/s, độ trễ 7.22 ms). Đã chính thức loại bỏ Kalman và giữ IIR làm bộ lọc vận tốc cuối cùng do cấu trúc đơn giản nhưng phù hợp hơn với động học hệ thống.
 
+### Ngày 6: Kiểm chứng mô hình cốt lõi (Manual Verification)
+
+* Xây dựng thành công kịch bản Sanity Check (`verify_manual.m`) để kiểm thử độc lập toán học lõi.
+* **Level 1 (Kiểm chứng Tĩnh - Vị trí):** Bơm lỗi nhảy trạng thái kép (double-jump) thủ công. Thuật toán State Machine và `position_compensator` phát hiện và bù trừ chính xác 100%, đạt sai số tuyệt đối `0.00e+00` rad.
+* **Level 2 (Kiểm chứng Động - Vận tốc):** Bằng kỹ thuật thời gian toán học đảo ngược và bộ lọc nhiễu dấu phẩy động (floating-point noise), cả 3 bộ ước lượng (M-Method, T-Method, Hybrid) đều hội tụ tuyệt đối về vận tốc lý tưởng với sai lệch `0.00e+00` rad/s. Nền tảng toán học lõi chính thức được nghiệm thu để chuẩn bị cho các thử nghiệm động học phức tạp.
+
 ## 🧮 Cập nhật tiến độ & Lộ trình 10 ngày (Bản cập nhật bám sát Đề tài 06)
 
 ### 🟢 Giai đoạn 1: Khởi tạo và Phân tích (Đã hoàn thành)
 
 * **Ngày 1 & 2 (Mô hình hóa & Chèn nhiễu):** Xây dựng thành công hệ thống Encoder 1000 PPR. Giả lập chân thực các hiện tượng nhiễu phần cứng (Jitter, Bounce, Phase error) và rớt xung ngẫu nhiên ở mức vi mô.
 * **Ngày 3 (Giải mã & Ước lượng):** Phát triển State Machine bắt thành công các sự kiện nhảy trạng thái kép. Hoàn thiện thuật toán Hybrid Estimator (Adaptive Fusion) khắc phục triệt để điểm yếu của cả M-Method và T-Method.
-* **Ngày 4 & 5 (Bù trừ vị trí & Chốt bộ lọc vận tốc):** Áp dụng State-Transition Compensation và bộ lọc IIR (`alpha = 0.15`). Thuật toán Compensation cải thiện >20% sai số vị trí. Chốt hạ IIR sau khi chứng minh ước lượng Kalman bị trễ pha. Hoàn thành Sanity Check (sai lệch `0.00e+00 rad`) và xác định được điểm gục ngã của hệ thống ở ngưỡng mất xung 1.0%.
+* **Ngày 4 & 5 (Bù trừ vị trí & Chốt bộ lọc vận tốc):** Áp dụng State-Transition Compensation và bộ lọc IIR (`alpha = 0.15`). Thuật toán Compensation cải thiện >20% sai số vị trí. Chốt hạ IIR sau khi chứng minh ước lượng Kalman bị trễ pha. Xác định được điểm gục ngã của hệ thống ở ngưỡng mất xung 1.0%.
 
 ### 🟡 Giai đoạn 2: Kiểm chứng và Đóng gói (Kế hoạch sắp tới)
 
-* **Ngày 6 (Kiểm chứng mô hình - Verification):** Thực hiện Manual Verification (Sanity Check) tính tay để kiểm chứng độ chính xác tuyệt đối của các công thức toán học cốt lõi, đáp ứng yêu cầu bắt buộc.
+### 🟡 Giai đoạn 2: Kiểm chứng và Đóng gói (Đang thực hiện)
+
+* **🟢 Ngày 6 (Kiểm chứng mô hình - Verification):** Đã hoàn thành Manual Verification (Sanity Check) tính tay. Nền tảng toán học cốt lõi đạt sai số tuyệt đối `0.00e+00` ở cả vị trí và vận tốc.
 * **Ngày 7 (Kịch bản thử nghiệm - Scenario Testing):** Thiết kế và chạy tối thiểu 5 kịch bản khác nhau bao gồm: tăng tốc nhanh, vùng tốc độ rất thấp, và đảo chiều quay (zero-crossing) để đánh giá hành vi của hệ thống.
 * **Ngày 8 (Phân tích tính bất định - Uncertainty Analysis):** Chạy Uncertainty / Sensitivity Analysis bằng phương pháp Monte Carlo để đánh giá sai số theo biên độ nhiễu và tỷ lệ mất xung.
 * **Ngày 9 (Tổng hợp Dữ liệu):** Tổng hợp các metric định lượng (RMSE, MAE, Delay) để chứng minh tính đúng đắn của toàn bộ pipeline qua các kịch bản thử nghiệm.
@@ -88,7 +96,5 @@ Repository này chứa mã nguồn MATLAB mô phỏng và xử lý tín hiệu c
 ---
 
 *Dự án đang trong quá trình phát triển (Lộ trình 10 ngày).*
-
-```
 
 ```
