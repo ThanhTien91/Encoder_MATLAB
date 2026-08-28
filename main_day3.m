@@ -37,7 +37,10 @@ drop_rate = 0.01; % Tỷ lệ mất xung = 1%
 % ==========================================
 % 4. BỘ GIẢI MÃ QUADRATURE (X4 DECODER)
 % ==========================================
-[pos_count, error_flag] = quadrature_decoder_x4(A_noisy, B_noisy);
+[pos_count, missing_count] = quadrature_decoder_x4(A_noisy, B_noisy);
+
+% Chuyển missing_count {-2, 0, +2} thành binary error flag {0, 1}
+error_flag = double(missing_count ~= 0);
 
 % Đếm lỗi và sự kiện lỗi (chuyển trạng thái từ 0 -> 1)
 num_errors = sum(error_flag);
