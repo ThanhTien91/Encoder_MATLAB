@@ -1,20 +1,31 @@
 function params = default_params()
-% ==============================
-% SYSTEM PARAMETERS
-% ==============================
+    % ==============================================================
+    % SYSTEM PARAMETERS & CONFIGURATION
+    % Đã tích hợp Yếu tố môi trường, Giới hạn băng thông và Validation
+    % ==============================================================
 
-% Random seed - reproducibility
-params.rng_seed = 42;
+    % --- 1. Thông số Cơ bản ---
+    params.rng_seed = 42;
+    params.Fs       = 1e6;       % Tần số lấy mẫu hệ thống (1 MHz)
+    params.PPR      = 1000;      % Xung trên mỗi vòng (Pulses Per Revolution)
+    params.duration = 2.0;       % Thời gian mô phỏng (s)
+    params.max_rpm  = 600;       % Tốc độ danh định tối đa (RPM)
 
-% Sampling frequency
-params.Fs = 1e6;          % 1 MHz
+    % --- 2. Yếu tố Môi trường (Environmental Factors) ---
+    params.env.T_ref = 25;       % Nhiệt độ chuẩn (độ C)
+    params.env.k_T   = 0.005;    % Hệ số trôi pha theo nhiệt độ (rad/độ C)
+                                 % Giả thiết mô hình: Độ giãn nở cơ nhiệt làm lệch khe quang học
 
-% Encoder resolution
-params.PPR = 1000;        % Pulses per revolution
+    % --- 3. Giới hạn Phần cứng (Hardware Saturation Limits) ---
+    params.hw.max_event_freq = 50000; % Băng thông tối đa của vi điều khiển/optocoupler (50 kHz)
+                                      % Ở PPR=1000, 50kHz tương đương khoảng 750 RPM
 
-% Simulation duration
-params.duration = 2.0;    % seconds
-
-% Maximum speed
-params.max_rpm = 600;     % RPM
+    % ==============================================================
+    % INPUT VALIDATION (Kiểm tra tính hợp lệ của tham số)
+    % ==============================================================
+    assert(params.PPR > 0, 'Lỗi: PPR phải là số dương.');
+    assert(params.Fs > 0, 'Lỗi: Tần số lấy mẫu Fs phải lớn hơn 0.');
+    assert(params.max_rpm > 0, 'Lỗi: Tốc độ tối đa max_rpm phải lớn hơn 0.');
+    assert(params.env.T_ref >= -50 && params.env.T_ref <= 150, 'Lỗi: Nhiệt độ chuẩn phi thực tế.');
+    assert(params.hw.max_event_freq > 1000, 'Lỗi: Băng thông phần cứng quá thấp.');
 end

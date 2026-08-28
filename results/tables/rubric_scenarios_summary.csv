@@ -1,0 +1,6 @@
+Scenario_Name,Conditions,Hybrid_RMSE,Notes
+S1_Nominal,"10 rad/s, 25C, No Noise",0.0007606075574,Baseline
+S2_Low_Noise,Jitter = 0.005 rad,13.8999945279865,Robustness
+S3_High_Noise,Jitter = 0.05 rad,14.7104295720764,Stress test
+S4_Parameter_Deviation,Temp = 60C,0.1256737979774,Thermal Drift 0.18 rad
+S5_Hardware_Fault,Accel to 800 RPM,11.0736547268942,Missed 618 events

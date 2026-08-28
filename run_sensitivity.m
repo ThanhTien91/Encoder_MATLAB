@@ -94,3 +94,16 @@ title('Final Drift vs. Tỷ lệ mất xung');
 xlabel('Pulse Loss (%)'); 
 ylabel('Final Drift (rad)'); 
 grid on;
+
+% ==========================================
+% 6. TỰ ĐỘNG LƯU KẾT QUẢ
+% ==========================================
+
+if ~exist('results/figure/sensitivity', 'dir')
+    mkdir('results/figure/sensitivity');
+end
+
+saveas(fig_sens, ...
+    'results/figure/sensitivity/sensitivity analysis.png');
+
+fprintf('Đã lưu hình sensitivity analysis vào results/figure/sensitivity/\n');
