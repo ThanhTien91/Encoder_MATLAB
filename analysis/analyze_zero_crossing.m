@@ -6,6 +6,7 @@
 clc; clear; close all;
 addpath(fullfile(pwd, '..', 'decoder'));
 addpath(fullfile(pwd, '..', 'config'));
+addpath(fullfile(pwd, '..', 'models'));
 
 params = default_params();
 PPR = params.PPR;
