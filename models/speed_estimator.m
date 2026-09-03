@@ -1,8 +1,16 @@
-function [omega_M, omega_T, omega_Hybrid] = speed_estimator(pos_count, t, PPR, error_flag)
+function [omega_M, omega_T, omega_Hybrid] = speed_estimator(pos_count, t, PPR, error_flag, outlier_threshold)
     % =========================================================
     % SPEED ESTIMATOR
     % M-Method, T-Method & Adaptive Hybrid Fusion
+    %
+    % outlier_threshold : ngưỡng loại nhiễu (rad/s) của T-Method.
+    %   Tham số tùy chọn - nếu không truyền vào, mặc định = 40 rad/s
+    %   (giữ đúng hành vi gốc, không phá vỡ các script hiện có).
     % =========================================================
+
+    if nargin < 5 || isempty(outlier_threshold)
+        outlier_threshold = 40; % giá trị mặc định gốc
+    end
 
     % --- 1. KHỞI TẠO VÀ ÉP KIỂU ---
     % Ép kiểu về vector hàng an toàn
@@ -53,7 +61,7 @@ function [omega_M, omega_T, omega_Hybrid] = speed_estimator(pos_count, t, PPR, e
                     tmp_omega = ((pos_count(i) - last_cnt) * dp_rad) / delta_t;
                     
                     % Outlier Rejection: Chặn gai khổng lồ do lỗi câm
-                    if i > 1 && abs(tmp_omega - omega_T(i-1)) > 40
+                    if i > 1 && abs(tmp_omega - omega_T(i-1)) > outlier_threshold
                         omega_T(i) = omega_T(i-1);
                         
                         % --- VÁ LỖI CỰC KỲ QUAN TRỌNG ---
@@ -106,5 +114,17 @@ function [omega_M, omega_T, omega_Hybrid] = speed_estimator(pos_count, t, PPR, e
         window_ma = 1; 
     end
     
-    omega_Hybrid = movmean(omega_Hybrid_raw, window_ma);
+    omega_Hybrid = fast_movmean(omega_Hybrid_raw, window_ma);
+end
+function y = fast_movmean(x, w)
+    x = x(:)';
+    N = length(x);
+    half1 = floor((w-1)/2);
+    half2 = ceil((w-1)/2);
+    xpad = [zeros(1,half1), x, zeros(1,half2)];
+    onespad = [zeros(1,half1), ones(1,N), zeros(1,half2)];
+    kernel = ones(1,w);
+    s = conv(xpad, kernel, 'valid');
+    c = conv(onespad, kernel, 'valid');
+    y = s ./ c;
 end

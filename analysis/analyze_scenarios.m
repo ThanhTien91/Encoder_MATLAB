@@ -53,5 +53,16 @@ fprintf('=======================================================================
 
 % 3. Xuất file CSV
 csv_path = fullfile(out_dir, 'scenario_summary.csv');
-writecell(csv_data, csv_path);
+if exist('writecell', 'file') == 2 || exist('writecell', 'builtin')
+    writecell(csv_data, csv_path);
+else
+    % Octave chưa có writecell -> ghi CSV thủ công (MATLAB vẫn dùng writecell ở trên)
+    fid = fopen(csv_path, 'w');
+    for r = 1:size(csv_data, 1)
+        row = csv_data(r, :);
+        row_str = cellfun(@(x) num2str(x), row, 'UniformOutput', false);
+        fprintf(fid, '%s\n', strjoin(row_str, ','));
+    end
+    fclose(fid);
+end
 fprintf('>> Đã xuất bảng tổng hợp ra file: %s\n', csv_path);

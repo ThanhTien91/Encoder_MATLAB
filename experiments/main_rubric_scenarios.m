@@ -41,7 +41,8 @@ theta_1 = omega_1 * t1;
 
 [A1, B1] = encoder_model(theta_1, params, 0);
 [pos_count_1, ~] = quadrature_decoder_x4(A1, B1);
-[~, ~, o_H1] = speed_estimator(pos_count_1, t1, PPR, zeros(size(t1)));
+[o_M1, o_T1, o_H1] = speed_estimator(pos_count_1, t1, PPR, zeros(size(t1)));
+theta_est_1 = pos_count_1 * dp_rad;
 
 start_idx = max(1, round(0.05 * Fs)); % Bỏ qua 50ms transient
 m1 = compute_metrics(omega_1 * ones(length(t1)-start_idx+1, 1), o_H1(start_idx:end)');
@@ -51,31 +52,37 @@ csv_data(2, :) = {'S1_Nominal', '10 rad/s, 25C, No Noise', m1.rmse, 'Baseline'};
 
 %% ========================================================================
 % S2: LOW NOISE (Nhiễu Jitter Nhẹ)
-% Điều kiện: Tốc độ 10 rad/s, Jitter = 0.005 rad (Dao động cơ khí nhỏ).
+% Điều kiện: Tốc độ 10 rad/s, jitter cạnh xung nhẹ (±1 mẫu, bounce 5%).
+% SỬA: không cộng nhiễu Gaussian trực tiếp vào theta (đã lớn hơn nhiều lần
+% bước lượng tử dp_rad ~ 0.00157 rad, gây vỡ decoder một cách phi thực tế).
+% Thay bằng nhiễu ở miền cạnh xung A/B, giống cách main_day2.m đang làm.
 % ========================================================================
-theta_2 = theta_1 + 0.005 * randn(size(theta_1));
+[A1_edges, B1_edges] = encoder_model(theta_1, params, 0);
+[A2, B2] = inject_micro_noise(A1_edges, B1_edges, 1, 0.05); % jitter nhẹ
 
-[A2, B2] = encoder_model(theta_2, params, 0);
 [pos_count_2, ~] = quadrature_decoder_x4(A2, B2);
-[~, ~, o_H2] = speed_estimator(pos_count_2, t1, PPR, zeros(size(t1)));
+[o_M2, o_T2, o_H2] = speed_estimator(pos_count_2, t1, PPR, zeros(size(t1)));
+theta_est_2 = pos_count_2 * dp_rad;
 
 m2 = compute_metrics(omega_1 * ones(length(t1)-start_idx+1, 1), o_H2(start_idx:end)');
-fprintf('| %-19s | %-30s | %-12.4f | Robustness     |\n', 'S2: Low Noise', 'Jitter = 0.005 rad', m2.rmse);
-csv_data(3, :) = {'S2_Low_Noise', 'Jitter = 0.005 rad', m2.rmse, 'Robustness'};
+fprintf('| %-19s | %-30s | %-12.4f | Robustness     |\n', 'S2: Low Noise', 'Edge jitter +-1 mau, bounce 5%', m2.rmse);
+csv_data(3, :) = {'S2_Low_Noise', 'Edge jitter +-1 sample, bounce 5%', m2.rmse, 'Robustness'};
 
 %% ========================================================================
 % S3: HIGH NOISE (Nhiễu Jitter Nặng)
-% Điều kiện: Tốc độ 10 rad/s, Jitter = 0.05 rad (Rung lắc nghiêm trọng).
+% Điều kiện: Tốc độ 10 rad/s, jitter cạnh xung nặng (±2 mẫu, bounce 25%
+% - đúng mức mặc định gốc của inject_micro_noise, tức "worst case" đã
+% dùng xuyên suốt Ngày 1-4).
 % ========================================================================
-theta_3 = theta_1 + 0.05 * randn(size(theta_1));
+[A3, B3] = inject_micro_noise(A1_edges, B1_edges, 2, 0.25); % jitter nặng (mặc định gốc)
 
-[A3, B3] = encoder_model(theta_3, params, 0);
 [pos_count_3, ~] = quadrature_decoder_x4(A3, B3);
-[~, ~, o_H3] = speed_estimator(pos_count_3, t1, PPR, zeros(size(t1)));
+[o_M3, o_T3, o_H3] = speed_estimator(pos_count_3, t1, PPR, zeros(size(t1)));
+theta_est_3 = pos_count_3 * dp_rad;
 
 m3 = compute_metrics(omega_1 * ones(length(t1)-start_idx+1, 1), o_H3(start_idx:end)');
-fprintf('| %-19s | %-30s | %-12.4f | Stress test    |\n', 'S3: High Noise', 'Jitter = 0.05 rad', m3.rmse);
-csv_data(4, :) = {'S3_High_Noise', 'Jitter = 0.05 rad', m3.rmse, 'Stress test'};
+fprintf('| %-19s | %-30s | %-12.4f | Stress test    |\n', 'S3: High Noise', 'Edge jitter +-2 mau, bounce 25%', m3.rmse);
+csv_data(4, :) = {'S3_High_Noise', 'Edge jitter +-2 sample, bounce 25%', m3.rmse, 'Stress test'};
 
 %% ========================================================================
 % S4: PARAMETER DEVIATION (Lệch tham số môi trường)
@@ -86,7 +93,8 @@ true_phase_drift = params.env.k_T * (T_test - params.env.T_ref); % Lệch pha th
 
 [A4, B4] = encoder_model(theta_1, params, true_phase_drift);
 [pos_count_4, ~] = quadrature_decoder_x4(A4, B4);
-[~, ~, o_H4] = speed_estimator(pos_count_4, t1, PPR, zeros(size(t1)));
+[o_M4, o_T4, o_H4] = speed_estimator(pos_count_4, t1, PPR, zeros(size(t1)));
+theta_est_4 = pos_count_4 * dp_rad;
 
 m4 = compute_metrics(omega_1 * ones(length(t1)-start_idx+1, 1), o_H4(start_idx:end)');
 
@@ -113,7 +121,8 @@ omega_true_5 = accel_rad * t5;
 [A5_sat, B5_sat, missed_transitions] = inject_acquisition_saturation(A5_ideal, B5_ideal, Fs, params);
 
 [pos_count_5, ~] = quadrature_decoder_x4(A5_sat, B5_sat);
-[~, ~, o_H5] = speed_estimator(pos_count_5, t5, PPR, zeros(size(t5)));
+[o_M5, o_T5, o_H5] = speed_estimator(pos_count_5, t5, PPR, zeros(size(t5)));
+theta_est_5 = pos_count_5 * dp_rad;
 
 m5 = compute_metrics(omega_true_5(start_idx:end), o_H5(start_idx:end)');
 note_S5 = sprintf('Missed %d events', missed_transitions);
@@ -137,5 +146,83 @@ fprintf(' => HỆ THỐNG PHÁT HIỆN THÀNH CÔNG NHIỄU MÔI TRƯỜNG!\n');
 out_dir = fullfile('..', 'results', 'tables');
 if ~exist(out_dir, 'dir'), mkdir(out_dir); end
 csv_path = fullfile(out_dir, 'rubric_scenarios_summary.csv');
-writecell(csv_data, csv_path);
+if exist('writecell', 'file') == 2 || exist('writecell', 'builtin')
+    writecell(csv_data, csv_path);
+else
+    % Octave chưa có writecell -> ghi CSV thủ công (MATLAB vẫn dùng writecell ở trên)
+    fid = fopen(csv_path, 'w');
+    for r = 1:size(csv_data, 1)
+        row = csv_data(r, :);
+        row_str = cellfun(@(x) num2str(x), row, 'UniformOutput', false);
+        fprintf(fid, '%s\n', strjoin(row_str, ','));
+    end
+    fclose(fid);
+end
 fprintf('\n>> Đã xuất bảng báo cáo nghiệm thu ra file: %s\n', csv_path);
+
+% ========================================================================
+% FIX (Bước 4): Lưu scenario_results.mat để analyze_scenarios.m chạy được
+% từ một lần clone/checkout sạch, không phụ thuộc file .mat tạo thủ công.
+% Định dạng khớp với những gì analyze_scenarios.m đang đọc:
+%   scenario_data.(name).position.true / .est
+%   scenario_data.(name).speed.true / .M / .T / .Hybrid
+%   scenario_data.(name).name
+% ========================================================================
+scenario_data = struct();
+
+% Giảm mẫu trước khi lưu: file gốc (đủ 1e6+ mẫu/kịch bản x 6 mảng x 5 kịch
+% bản) nặng >450MB, không hợp lý để commit lên git và cũng không cần thiết
+% vì compute_metrics() (RMSE/MAE) không đổi đáng kể khi downsample đều một
+% cặp tín hiệu true/est đã đồng bộ theo cùng chỉ số mẫu.
+decim = 100; % 1 MHz -> tương đương 10 kHz, vẫn đủ mượt để vẽ đồ thị
+
+% FIX: cắt cùng 50ms transient khởi động (start_idx) như bảng rubric
+% chính ở trên, để analyze_scenarios.m (đọc lại file .mat này) tính ra
+% RMSE nhất quán với bảng BÁO CÁO NGHIỆM THU, thay vì lẫn thêm sai số
+% khởi động của bộ lọc khiến 2 bảng lệch nhau (vd S1 lệch tới 18 lần).
+
+scenario_data.S1_Nominal.name = 'S1: Nominal';
+scenario_data.S1_Nominal.position.true = theta_1(start_idx:decim:end);
+scenario_data.S1_Nominal.position.est  = theta_est_1(start_idx:decim:end);
+scenario_data.S1_Nominal.speed.true    = omega_1 * ones(size(t1(start_idx:decim:end)));
+scenario_data.S1_Nominal.speed.M       = o_M1(start_idx:decim:end);
+scenario_data.S1_Nominal.speed.T       = o_T1(start_idx:decim:end);
+scenario_data.S1_Nominal.speed.Hybrid  = o_H1(start_idx:decim:end);
+
+scenario_data.S2_Low_Noise.name = 'S2: Low Noise';
+scenario_data.S2_Low_Noise.position.true = theta_1(start_idx:decim:end);
+scenario_data.S2_Low_Noise.position.est  = theta_est_2(start_idx:decim:end);
+scenario_data.S2_Low_Noise.speed.true    = omega_1 * ones(size(t1(start_idx:decim:end)));
+scenario_data.S2_Low_Noise.speed.M       = o_M2(start_idx:decim:end);
+scenario_data.S2_Low_Noise.speed.T       = o_T2(start_idx:decim:end);
+scenario_data.S2_Low_Noise.speed.Hybrid  = o_H2(start_idx:decim:end);
+
+scenario_data.S3_High_Noise.name = 'S3: High Noise';
+scenario_data.S3_High_Noise.position.true = theta_1(start_idx:decim:end);
+scenario_data.S3_High_Noise.position.est  = theta_est_3(start_idx:decim:end);
+scenario_data.S3_High_Noise.speed.true    = omega_1 * ones(size(t1(start_idx:decim:end)));
+scenario_data.S3_High_Noise.speed.M       = o_M3(start_idx:decim:end);
+scenario_data.S3_High_Noise.speed.T       = o_T3(start_idx:decim:end);
+scenario_data.S3_High_Noise.speed.Hybrid  = o_H3(start_idx:decim:end);
+
+scenario_data.S4_Parameter_Deviation.name = 'S4: Parameter Drift';
+scenario_data.S4_Parameter_Deviation.position.true = theta_1(start_idx:decim:end);
+scenario_data.S4_Parameter_Deviation.position.est  = theta_est_4(start_idx:decim:end);
+scenario_data.S4_Parameter_Deviation.speed.true    = omega_1 * ones(size(t1(start_idx:decim:end)));
+scenario_data.S4_Parameter_Deviation.speed.M       = o_M4(start_idx:decim:end);
+scenario_data.S4_Parameter_Deviation.speed.T       = o_T4(start_idx:decim:end);
+scenario_data.S4_Parameter_Deviation.speed.Hybrid  = o_H4(start_idx:decim:end);
+
+scenario_data.S5_Hardware_Fault.name = 'S5: Acquisition Fault';
+scenario_data.S5_Hardware_Fault.position.true = theta_5(start_idx:decim:end);
+scenario_data.S5_Hardware_Fault.position.est  = theta_est_5(start_idx:decim:end);
+scenario_data.S5_Hardware_Fault.speed.true    = omega_true_5(start_idx:decim:end);
+scenario_data.S5_Hardware_Fault.speed.M       = o_M5(start_idx:decim:end);
+scenario_data.S5_Hardware_Fault.speed.T       = o_T5(start_idx:decim:end);
+scenario_data.S5_Hardware_Fault.speed.Hybrid  = o_H5(start_idx:decim:end);
+
+mat_out_dir = fullfile('..', 'results');
+if ~exist(mat_out_dir, 'dir'), mkdir(mat_out_dir); end
+mat_path = fullfile(mat_out_dir, 'scenario_results.mat');
+save(mat_path, 'scenario_data');
+fprintf('>> Đã lưu %s để analyze_scenarios.m chạy được từ repo sạch.\n', mat_path);

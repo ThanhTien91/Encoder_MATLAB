@@ -13,14 +13,19 @@ Dự án bám sát 100% yêu cầu **Đề tài 06** và **Khung Yêu cầu Hệ
  ┣ 📂 config              # Cấu hình tham số hệ thống, môi trường (nhiệt độ) và giới hạn phần cứng
  ┣ 📂 models              # Sinh tín hiệu Encoder, tiêm nhiễu ngẫu nhiên, trôi pha, bão hòa băng thông
  ┣ 📂 decoder             # Giải mã Quadrature X4, Bù trừ vị trí (Compensator), Hiệu chuẩn (Calibration)
- ┣ 📂 analysis            # Khung đánh giá định lượng (Metrics, True Monte Carlo, Fs Sweep, Speed Sweep)
+ ┣ 📂 analysis            # Khung đánh giá định lượng (Metrics, Monte Carlo, Fs Sweep, Speed Sweep)
  ┣ 📂 experiments         # Chứa kịch bản động học (Day 7) và kịch bản nghiệm thu Rubric (Day 8)
  ┣ 📂 results             # Tự động lưu trữ số liệu (.csv, .mat) và biểu đồ phân tích (.png)
- ┣ 📜 main_day1.m -> main_day7.m  # Các script mô phỏng phát triển theo từng giai đoạn
+ ┃  ┣ 📂 tables           # Bảng tổng hợp kết quả (.csv)
+ ┃  └ 📂 figure           # Biểu đồ theo ngày (day1 -> day8)
+ ┣ 📜 main_day1.m         # Script chạy nghiệm thu Ngày 1 (Hệ lý tưởng)
+ ┣ 📜 main_day2.m         # Script chạy nghiệm thu Ngày 2 (Hệ có nhiễu)
+ ┣ 📜 main_day3.m         # Script chạy nghiệm thu Ngày 3 (Giải mã & Ước lượng)
+ ┣ 📜 main_day4.m         # Script chạy nghiệm thu Ngày 4 (Bù trừ lỗi & Lọc IIR)
+ ┣ 📜 main_day7.m         # Script chạy nghiệm thu Ngày 7 (Kịch bản động học)
+ ┣ 📜 generate_scenario_data.m  # Sinh dữ liệu kịch bản
  ┣ 📜 verify_manual.m     # Kịch bản kiểm chứng chéo toán học (Manual Sanity Check)
- ┣ 📜 .gitignore          # Cấu hình bỏ qua file rác và file dữ liệu lớn
  ┗ 📜 README.md           # Thông tin đồ án
-
 ```
 
 ---
@@ -29,12 +34,12 @@ Dự án bám sát 100% yêu cầu **Đề tài 06** và **Khung Yêu cầu Hệ
 
 **1. Nghiệm thu Khung Hệ Thống (Rubric Scenarios - Quan trọng nhất):**
 
-* Điểu hướng vào `experiments/` và chạy `main_rubric_scenarios.m`.
+* Điều hướng vào `experiments/` và chạy `main_rubric_scenarios.m`.
 * Script này sẽ tự động chạy 5 kịch bản bắt buộc: Lý tưởng (Nominal), Nhiễu Jitter (Noise), Sai số nhiệt độ (Parameter Drift), và Quá tải băng thông (Acquisition Saturation). Kết quả trả về bảng tổng hợp RMSE, chẩn đoán Calibration, và tự động lưu ra `results/tables/rubric_scenarios_summary.csv`.
 
 **2. Phân tích Sức bền Thống kê (Uncertainty Analysis):**
 
-* Điểu hướng vào `analysis/` và chạy `sensitivity_analysis.m`: Thực hiện True Monte Carlo (100 trials) để đo khoảng tin cậy (P05-P95) và sai số tồi tệ nhất (Worst-case RMSE) của hệ thống trước nhiễu Jitter.
+* Điều hướng vào `analysis/` và chạy `sensitivity_analysis.m`: Thực hiện True Monte Carlo (100 trials) để đo khoảng tin cậy (P05-P95) và sai số tồi tệ nhất (Worst-case RMSE) của hệ thống trước nhiễu Jitter.
 * Chạy `analyze_pulse_loss.m`: Đánh giá Monte Carlo (50 trials) để đo phần trăm (%) hiệu quả của bộ bù trừ vị trí khi rớt xung từ 0.1% đến 2.0%.
 * Chạy `analyze_sampling_frequency.m`: Quét dải tần số timer (Fs Sweep) để chứng minh hiện tượng nhiễu phách lượng tử (Quantization Beating) của T-Method.
 
@@ -61,9 +66,9 @@ Dự án bám sát 100% yêu cầu **Đề tài 06** và **Khung Yêu cầu Hệ
 * **Ngày 6 (Kiểm chứng mô hình):** Hoàn thành Manual Verification tính tay. Thuật toán cốt lõi hội tụ tuyệt đối.
 * **Ngày 7 (Thử nghiệm Động học):** Đo lường RMSE và Tracking Delay trên 5 quỹ đạo vận hành (Dynamic Scenarios). Hybrid Estimator xử lý mượt mà vùng Zero-crossing nhờ cơ chế Software Timeout.
 * **Ngày 8 (Khung Hệ thống & Monte Carlo):**
-* Tích hợp mô hình Sai lệch pha do nhiệt độ (Thermal Phase Drift) và Thuật toán Tự động Hiệu chuẩn (Multi-edge Calibration) đạt độ chính xác >99%.
-* Giả lập giới hạn bão hòa phần cứng (Hardware Bandwidth Saturation) khi tốc độ vượt quá ngưỡng ngắt (Interrupt).
-* Chuyển đổi toàn bộ kịch bản đo lường sang True Monte Carlo Uncertainty Analysis. Tính toán Mean, Std, P05, P95, và Worst-case Max Error. Xuất tự động toàn bộ dữ liệu ra `.csv` và `.png`.
+  * Tích hợp mô hình Sai lệch pha do nhiệt độ (Thermal Phase Drift) và Thuật toán Tự động Hiệu chuẩn (Multi-edge Calibration) đạt độ chính xác >99%.
+  * Giả lập giới hạn bão hòa phần cứng (Hardware Bandwidth Saturation) khi tốc độ vượt quá ngưỡng ngắt (Interrupt).
+  * Chuyển đổi toàn bộ kịch bản đo lường sang True Monte Carlo Uncertainty Analysis. Tính toán Mean, Std, P05, P95, và Worst-case Max Error. Xuất tự động toàn bộ dữ liệu ra `.csv` và `.png`.
 
 ### 🟡 Giai đoạn 3: Đóng gói và Báo cáo (Ngày 9 - Ngày 10)
 
@@ -72,3 +77,4 @@ Dự án bám sát 100% yêu cầu **Đề tài 06** và **Khung Yêu cầu Hệ
 
 ```
 Dự án đang trong quá trình phát triển (Lộ trình 10 ngày).
+```

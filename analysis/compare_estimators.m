@@ -8,8 +8,7 @@ clc; clear; close all;
 % 1. Nạp đường dẫn thuật toán và module tính toán
 addpath(fullfile(pwd, '..', 'decoder'));
 addpath(fullfile(pwd, '..', 'config'));
-addpath(fullfile(pwd, '..', 'models'));
-
+addpath(fullfile(pwd, '..', 'models'));  % FIX: thiếu path này khiến speed_estimator() undefined
 % addpath(pwd); % Hàm compute_metrics nằm cùng thư mục analysis
 
 % 2. Lấy tham số hệ thống
