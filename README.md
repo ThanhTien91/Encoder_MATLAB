@@ -1,80 +1,235 @@
-# ⚙️ Đồ án: Bộ ước lượng vị trí và vận tốc từ encoder quadrature có mất xung
+# ⚙️ Đồ án: Bộ ước lượng vị trí và vận tốc từ Encoder Quadrature có mất xung
 
-Repository này chứa mã nguồn MATLAB mô phỏng và xử lý tín hiệu cho Quadrature Encoder. Mục tiêu của dự án là thiết lập mô hình vật lý có chứa nhiễu, sai số môi trường, và bão hòa phần cứng, từ đó xây dựng các thuật toán giải mã, tự động hiệu chuẩn (calibration), bù trừ vị trí, và ước lượng tốc độ lai ghép (Hybrid Fusion).
+Repository này chứa mã nguồn MATLAB mô phỏng và đánh giá hệ thống Encoder Quadrature trong các điều kiện nhiễu, mất xung, sai lệch tham số môi trường và giới hạn băng thông phần cứng.
 
-Dự án bám sát 100% yêu cầu **Đề tài 06** và **Khung Yêu cầu Hệ thống (Rubric)**: Đánh giá định lượng qua 5 kịch bản chuẩn (Nominal, Noise, Parameter Drift, Hardware Fault) và phân tích độ bất định bằng Monte Carlo.
+Mục tiêu của dự án là xây dựng một pipeline hoàn chỉnh gồm mô hình hóa quỹ đạo và encoder, giải mã Quadrature X4, phát hiện lỗi mất xung, bù trừ vị trí, hiệu chuẩn sai lệch pha và ước lượng vận tốc bằng M-Method, T-Method và Hybrid Fusion. Hệ thống được đánh giá định lượng thông qua các kịch bản vận hành và các phân tích Monte Carlo.
 
 ---
 
 ## 📂 Cấu trúc thư mục
 
 ```text
-📦 Encoder_Project
- ┣ 📂 config              # Cấu hình tham số hệ thống, môi trường (nhiệt độ) và giới hạn phần cứng
- ┣ 📂 models              # Sinh tín hiệu Encoder, tiêm nhiễu ngẫu nhiên, trôi pha, bão hòa băng thông
- ┣ 📂 decoder             # Giải mã Quadrature X4, Bù trừ vị trí (Compensator), Hiệu chuẩn (Calibration)
- ┣ 📂 analysis            # Khung đánh giá định lượng (Metrics, Monte Carlo, Fs Sweep, Speed Sweep)
- ┣ 📂 experiments         # Chứa kịch bản động học (Day 7) và kịch bản nghiệm thu Rubric (Day 8)
- ┣ 📂 results             # Tự động lưu trữ số liệu (.csv, .mat) và biểu đồ phân tích (.png)
- ┃  ┣ 📂 tables           # Bảng tổng hợp kết quả (.csv)
- ┃  └ 📂 figure           # Biểu đồ theo ngày (day1 -> day8)
- ┣ 📜 main_day1.m         # Script chạy nghiệm thu Ngày 1 (Hệ lý tưởng)
- ┣ 📜 main_day2.m         # Script chạy nghiệm thu Ngày 2 (Hệ có nhiễu)
- ┣ 📜 main_day3.m         # Script chạy nghiệm thu Ngày 3 (Giải mã & Ước lượng)
- ┣ 📜 main_day4.m         # Script chạy nghiệm thu Ngày 4 (Bù trừ lỗi & Lọc IIR)
- ┣ 📜 main_day7.m         # Script chạy nghiệm thu Ngày 7 (Kịch bản động học)
- ┣ 📜 generate_scenario_data.m  # Sinh dữ liệu kịch bản
- ┣ 📜 verify_manual.m     # Kịch bản kiểm chứng chéo toán học (Manual Sanity Check)
- ┗ 📜 README.md           # Thông tin đồ án
+📦 Encoder_MATLAB
+ ┣ 📂 config
+ │  └── default_params.m
+ ┣ 📂 models
+ │  ├── trajectory_model.m
+ │  ├── encoder_model.m
+ │  ├── inject_micro_noise.m
+ │  ├── inject_pulse_loss.m
+ │  ├── inject_acquisition_saturation.m
+    ├── compare_estimators.m
+ │  └── speed_estimator.m
+ ┣ 📂 decoder
+ │  ├── quadrature_decoder_x4.m
+ │  ├── position_compensator.m
+ │  └── encoder_calibration.m
+ ┣ 📂 analysis
+ │  ├── compute_metrics.m
+ │  ├── analyze_zero_crossing.m
+ │  ├── analyze_sampling_frequency.m
+ │  ├── analyze_pulse_loss.m
+ │  ├── analyze_scenarios.m
+ │  └── sensitivity_analysis.m
+ ┣ 📂 experiments
+ │  ├── main_day5.m
+ │  ├── main_rubric_scenarios.m
+ │  └── velocity_kf.m
+ ┣ 📂 results
+ │  ├── scenario_results.mat
+ │  ├── tables
+ │  └── figure
+ ┣ 📜 main_day1.m
+ ┣ 📜 main_day2.m
+ ┣ 📜 main_day3.m
+ ┣ 📜 main_day4.m
+ ┣ 📜 main_day7.m
+ ┣ 📜 run_sensitivity.m
+ ┣ 📜 verify_manual.m
+ ┗ 📜 README.md
 ```
 
 ---
 
-## 🚀 Hướng dẫn chạy code
+## 🚀 Hướng dẫn nghiệm thu
 
-**1. Nghiệm thu Khung Hệ Thống (Rubric Scenarios - Quan trọng nhất):**
+### 1. Kiểm tra mô hình cơ sở
 
-* Điều hướng vào `experiments/` và chạy `main_rubric_scenarios.m`.
-* Script này sẽ tự động chạy 5 kịch bản bắt buộc: Lý tưởng (Nominal), Nhiễu Jitter (Noise), Sai số nhiệt độ (Parameter Drift), và Quá tải băng thông (Acquisition Saturation). Kết quả trả về bảng tổng hợp RMSE, chẩn đoán Calibration, và tự động lưu ra `results/tables/rubric_scenarios_summary.csv`.
+Từ thư mục gốc của repository, chạy:
 
-**2. Phân tích Sức bền Thống kê (Uncertainty Analysis):**
+```matlab
+main_day1
+```
 
-* Điều hướng vào `analysis/` và chạy `sensitivity_analysis.m`: Thực hiện True Monte Carlo (100 trials) để đo khoảng tin cậy (P05-P95) và sai số tồi tệ nhất (Worst-case RMSE) của hệ thống trước nhiễu Jitter.
-* Chạy `analyze_pulse_loss.m`: Đánh giá Monte Carlo (50 trials) để đo phần trăm (%) hiệu quả của bộ bù trừ vị trí khi rớt xung từ 0.1% đến 2.0%.
-* Chạy `analyze_sampling_frequency.m`: Quét dải tần số timer (Fs Sweep) để chứng minh hiện tượng nhiễu phách lượng tử (Quantization Beating) của T-Method.
+Kiểm tra quỹ đạo tốc độ, vị trí và tín hiệu Encoder A/B/Z.
 
-**3. Thử nghiệm Động học Chuyên sâu (Dynamic Scenarios):**
+### 2. Kiểm tra mô hình nhiễu và mất xung
 
-* Chạy `main_day7.m`: Kiểm thử độ bám sát của hệ thống trong 5 điều kiện vận hành khắc nghiệt (Vận tốc rất thấp, Đảo chiều qua điểm 0, Tăng tốc nhanh, Phanh gấp, Rung lắc vi mô).
+Chạy:
 
-**4. Kiểm chứng Toán học Lõi (Sanity Check):**
+```matlab
+main_day2
+```
 
-* Chạy `verify_manual.m`: Bơm lỗi nhảy trạng thái kép thủ công và dùng thời gian đảo ngược để xác thực thuật toán lõi đạt sai số tuyệt đối `0.00e+00` rad/s.
+Kiểm tra thống kê nhiễu và tỷ lệ mất xung.
+
+### 3. Kiểm tra bộ giải mã và bộ ước lượng
+
+Chạy:
+
+```matlab
+main_day3
+```
+
+Kiểm tra Quadrature X4 Decoder, phát hiện invalid transition và so sánh M-Method, T-Method và Hybrid Estimator.
+
+### 4. Kiểm tra bù trừ vị trí và lọc vận tốc
+
+Chạy:
+
+```matlab
+main_day4
+```
+
+Kiểm tra RMSE, MAE, Max Error và Final Drift trước/sau bù trừ.
+
+Để so sánh IIR với 1D Kalman Filter:
+
+```matlab
+cd experiments
+main_day5
+```
+
+### 5. Kiểm tra các kịch bản động học
+
+Từ thư mục gốc:
+
+```matlab
+main_day7
+```
+
+Các kịch bản gồm:
+
+* Very Low Constant Speed
+* Zero-Crossing & Direction Reversal
+* Fast Acceleration
+* Hard Brake
+* Micro-Vibrations
+
+### 6. Kiểm chứng toán học lõi
+
+Chạy:
+
+```matlab
+verify_manual
+```
+
+Script kiểm tra độc lập vị trí sau bù trừ và độ chính xác của các bộ ước lượng trong trường hợp tốc độ không đổi.
+
+### 7. Nghiệm thu theo kịch bản hệ thống
+
+Chạy:
+
+```matlab
+cd experiments
+main_rubric_scenarios
+```
+
+Script đánh giá 5 kịch bản:
+
+* S1: Nominal
+* S2: Low Noise
+* S3: High Noise
+* S4: Parameter Deviation
+* S5: Hardware Fault / Acquisition Saturation
+
+Kết quả được xuất ra:
+
+```text
+results/tables/rubric_scenarios_summary.csv
+```
+
+### 8. Phân tích Monte Carlo và độ nhạy
+
+Trong thư mục `analysis`:
+
+```matlab
+analyze_pulse_loss
+sensitivity_analysis
+analyze_sampling_frequency
+compare_estimators
+analyze_zero_crossing
+```
+
+Các phân tích lần lượt đánh giá:
+
+* độ bền đối với mất xung;
+* độ nhạy đối với nhiễu ngẫu nhiên;
+* ảnh hưởng của tần số lấy mẫu;
+* sai số của M/T/Hybrid theo dải tốc độ;
+* hành vi quanh vùng zero-crossing.
+
+Ngoài ra:
+
+```matlab
+cd ..
+run_sensitivity
+```
+
+thực hiện phân tích độ nhạy của sai số vị trí đối với tỷ lệ mất xung từ 0.1% đến 2.0%.
 
 ---
 
-## 🧮 Cập nhật tiến độ & Lộ trình 10 ngày
+## 🔁 Tái lập kết quả
 
-### 🟢 Giai đoạn 1: Khởi tạo và Thiết kế Thuật toán lõi (Ngày 1 - Ngày 5)
+Hệ thống sử dụng:
 
-* **Mô hình hóa & Nhiễu:** Xây dựng Encoder 1000 PPR. Giả lập nhiễu vi mô (Jitter, Bounce).
-* **Giải mã & Ước lượng:** Phát triển State Machine xử lý trạng thái kép. Hoàn thiện Hybrid Estimator (Adaptive Fusion) điều chỉnh trọng số tự động giữa M-Method và T-Method.
-* **Bù trừ & Lọc tín hiệu:** Ứng dụng State-Transition Compensation (cải thiện >20% sai số vị trí khi mất xung). Chốt sử dụng IIR Filter (`alpha = 0.15`) cho vận tốc sau khi chứng minh Kalman 1D bị trễ pha.
-
-### 🟢 Giai đoạn 2: Khung Đánh giá Định lượng & Toàn vẹn Hệ thống (Ngày 6 - Ngày 8)
-
-* **Ngày 6 (Kiểm chứng mô hình):** Hoàn thành Manual Verification tính tay. Thuật toán cốt lõi hội tụ tuyệt đối.
-* **Ngày 7 (Thử nghiệm Động học):** Đo lường RMSE và Tracking Delay trên 5 quỹ đạo vận hành (Dynamic Scenarios). Hybrid Estimator xử lý mượt mà vùng Zero-crossing nhờ cơ chế Software Timeout.
-* **Ngày 8 (Khung Hệ thống & Monte Carlo):**
-  * Tích hợp mô hình Sai lệch pha do nhiệt độ (Thermal Phase Drift) và Thuật toán Tự động Hiệu chuẩn (Multi-edge Calibration) đạt độ chính xác >99%.
-  * Giả lập giới hạn bão hòa phần cứng (Hardware Bandwidth Saturation) khi tốc độ vượt quá ngưỡng ngắt (Interrupt).
-  * Chuyển đổi toàn bộ kịch bản đo lường sang True Monte Carlo Uncertainty Analysis. Tính toán Mean, Std, P05, P95, và Worst-case Max Error. Xuất tự động toàn bộ dữ liệu ra `.csv` và `.png`.
-
-### 🟡 Giai đoạn 3: Đóng gói và Báo cáo (Ngày 9 - Ngày 10)
-
-* **Ngày 9 (Tổng hợp Báo cáo Kỹ thuật):** Lắp ghép các bảng số liệu CSV và đồ thị định lượng vào Báo cáo Kỹ thuật (Technical Report). Phân tích luận cứ về giao điểm tử thần của T-Method và hiện tượng "leo thang nhiễu".
-* **Ngày 10 (Nghiệm thu cuối):** Thiết kế Slide bảo vệ đồ án, kiểm tra độ tương thích của cấu trúc thư mục và nộp mã nguồn cuối cùng.
-
+```matlab
+params.rng_seed = 42;
 ```
-Dự án đang trong quá trình phát triển (Lộ trình 10 ngày).
-```
+
+và các script có thành phần ngẫu nhiên cố định random seed trước khi sinh nhiễu hoặc lỗi.
+
+Khi chạy cùng một script với cùng cấu hình tham số, kết quả phải được tái lập.
+
+---
+
+## 📊 Các chỉ số đánh giá
+
+Hệ thống sử dụng các chỉ số:
+
+* RMSE
+* MAE
+* Maximum Absolute Error
+* Bias
+* Standard Deviation
+* Final Drift
+* Estimation Delay / Latency
+
+Đối với các phân tích Monte Carlo, các thống kê như Mean, Standard Deviation, P05, P50, P95 và Worst-case Error được sử dụng khi phù hợp với từng phép thử.
+
+---
+
+## 🧩 Các đặc tính chính của hệ thống
+
+* Quadrature decoding X4
+* Phát hiện two-state jump / invalid transition
+* Bù trừ vị trí dựa trên trạng thái lỗi
+* M-Method
+* T-Method
+* Adaptive Hybrid Fusion
+* T-Method timeout và outlier rejection
+* IIR và 1D Kalman velocity filtering
+* Thermal phase drift
+* Multi-edge phase calibration
+* Acquisition bandwidth saturation
+* Pulse-loss sensitivity analysis
+* Monte Carlo uncertainty analysis
+* Dynamic scenario testing
+* Reproducible simulation with fixed random seed
+
+---
+
+## ✅ Trạng thái
+
+Dự án đã hoàn thiện phần mô phỏng, thuật toán lõi và khung đánh giá định lượng. Các kết quả cuối cùng được sử dụng để tổng hợp báo cáo kỹ thuật và chuẩn bị nghiệm thu.

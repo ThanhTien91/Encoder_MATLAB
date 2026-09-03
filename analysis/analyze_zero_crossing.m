@@ -4,9 +4,10 @@
 % =========================================================================
 
 clc; clear; close all;
-addpath(fullfile(pwd, '..', 'decoder'));
-addpath(fullfile(pwd, '..', 'config'));
-addpath(fullfile(pwd, '..', 'models'));  % FIX: thiếu path này khiến speed_estimator() undefined
+addpath(fullfile(pwd, 'decoder'));
+addpath(fullfile(pwd, 'config'));
+addpath(fullfile(pwd, 'models'));
+addpath(fullfile(pwd, 'analysis'));
 
 params = default_params();
 PPR = params.PPR;
