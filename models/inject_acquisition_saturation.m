@@ -49,53 +49,40 @@ last_event_idx = 1;
 total_missed = 0;
 
 % =========================================================================
-% 4. ACQUISITION STATE MACHINE
+% 4. ACQUISITION STATE MACHINE (ĐÃ VÁ LỖI PHASE CORRUPTION)
 % =========================================================================
-for i = 2:N
+lock_counter = 0; % Đếm số cạnh cần bỏ qua để giữ nguyên pha (bội số của 4)
 
-    % -------------------------------------------------------------
-    % Kiểm tra có transition mới trên A hoặc B không
-    % -------------------------------------------------------------
-    is_transition = ...
-        (A(i) ~= A(i-1)) || ...
-        (B(i) ~= B(i-1));
+for i = 2:N
+    is_transition = (A(i) ~= A(i-1)) || (B(i) ~= B(i-1));
 
     if is_transition
-
-        % Khoảng thời gian kể từ transition được chấp nhận gần nhất
-        delta_samples = i - last_event_idx;
-
-        % ---------------------------------------------------------
-        % Event được chấp nhận
-        % ---------------------------------------------------------
-        if delta_samples >= min_samples_between_events
-
-            A_sat(i) = A(i);
-            B_sat(i) = B(i);
-
-            last_event_idx = i;
-
-        % ---------------------------------------------------------
-        % Event bị drop do giới hạn bandwidth
-        % ---------------------------------------------------------
-        else
-
-            % Giữ nguyên trạng thái acquisition trước đó
+        if lock_counter > 0
+            % Đang trong chu kỳ xả bão hòa, bắt buộc bỏ qua để giữ đúng pha
             A_sat(i) = A_sat(i-1);
             B_sat(i) = B_sat(i-1);
-
-            % Chỉ đếm transition này là một missed transition
+            lock_counter = lock_counter - 1;
             total_missed = total_missed + 1;
-
+            last_event_idx = i; % Trượt mốc thời gian theo
+        else
+            delta_samples = i - last_event_idx;
+            if delta_samples >= min_samples_between_events
+                % Chấp nhận sự kiện
+                A_sat(i) = A(i);
+                B_sat(i) = B(i);
+                last_event_idx = i;
+            else
+                % Xảy ra bão hòa! Khóa 4 cạnh (1 full pulse) để chống dội pha
+                A_sat(i) = A_sat(i-1);
+                B_sat(i) = B_sat(i-1);
+                lock_counter = 3; % Đã rớt 1 cạnh, khóa 3 cạnh tiếp theo
+                total_missed = total_missed + 1;
+                last_event_idx = i;
+            end
         end
-
     else
-
-        % Không có transition:
-        % giữ nguyên trạng thái hiện tại
         A_sat(i) = A_sat(i-1);
         B_sat(i) = B_sat(i-1);
-
     end
 end
 
