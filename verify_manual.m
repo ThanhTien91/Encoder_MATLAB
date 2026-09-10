@@ -121,3 +121,198 @@ fprintf('| Hybrid Method   | %-16.6f | %-16.6f | %.2e   |\n', omega_ideal, val_H
 fprintf('----------------------------------------------------------------------\n');
 fprintf('=> KIỂM CHỨNG THÀNH CÔNG: Kết quả tính toán khớp giá trị lý thuyết trong sai số số học floating-point.\n');
 fprintf('======================================================================\n');
+
+%% ========================================================================
+% LEVEL 3: POSITION COMPENSATION GROUND TRUTH
+% =========================================================================
+fprintf('\n');
+fprintf('======================================================================\n');
+fprintf('       LEVEL 3: POSITION COMPENSATION GROUND TRUTH CHECK\n');
+fprintf('======================================================================\n');
+
+% =========================================================================
+% 1. PARAMETERS
+% =========================================================================
+PPR = 1000;
+CPR = PPR * 4;
+dp_rad = 2 * pi / CPR;
+
+% =========================================================================
+% 2. CREATE IDEAL QUADRATURE STATE SEQUENCE
+% =========================================================================
+% Forward sequence:
+% 00 -> 10 -> 11 -> 01 -> 00
+
+seq = [0, 2, 3, 1];
+
+% 500 true X4 transitions
+N_valid = 500;
+
+states_full = ...
+    seq(mod(0:N_valid, 4) + 1);
+
+% =========================================================================
+% 3. INJECT ONE MISSING TRANSITION
+% =========================================================================
+% Chọn state 01 để xóa.
+%
+% Bình thường:
+%
+%       11 -> 01 -> 00
+%
+% Sau khi mất transition 11 -> 01:
+%
+%       11 -------> 00
+%
+% Đây là một double-jump tương ứng với 2 X4 counts bị bỏ qua.
+%
+% Index 252 của chuỗi tương ứng state 01:
+%   index 251 = 11
+%   index 252 = 01
+%   index 253 = 00
+
+fault_idx = 252;
+
+% Kiểm tra state trước khi xóa
+assert(states_full(fault_idx) == 1, ...
+    'fault_idx không trỏ tới state 01 như mong đợi.');
+
+states = states_full;
+
+% Xóa state bị mất
+states(fault_idx) = [];
+
+% =========================================================================
+% 4. CONVERT STATE -> A/B
+% =========================================================================
+A_lvl3 = floor(states / 2);
+B_lvl3 = mod(states, 2);
+
+% =========================================================================
+% 5. RUN X4 DECODER
+% =========================================================================
+[pos_count_lvl3, missing_count_lvl3] = ...
+    quadrature_decoder_x4(A_lvl3, B_lvl3);
+
+% =========================================================================
+% 6. RAW + COMPENSATED POSITION
+% =========================================================================
+theta_raw_lvl3 = ...
+    pos_count_lvl3 * dp_rad;
+
+theta_comp_lvl3 = ...
+    position_compensator( ...
+        theta_raw_lvl3, ...
+        missing_count_lvl3, ...
+        PPR);
+
+% =========================================================================
+% 7. GROUND TRUTH
+% =========================================================================
+% Quan trọng:
+%
+% Rotor thực tế vẫn thực hiện đủ 500 X4 transitions.
+% Chỉ có một transition bị acquisition/decoder bỏ qua.
+%
+% Vì vậy ground truth vẫn = 500 counts.
+
+true_counts_lvl3 = N_valid;
+
+theta_true_lvl3 = ...
+    true_counts_lvl3 * dp_rad;
+
+% =========================================================================
+% 8. ERROR CALCULATION
+% =========================================================================
+err_raw_lvl3 = ...
+    abs(theta_raw_lvl3(end) - theta_true_lvl3);
+
+err_comp_lvl3 = ...
+    abs(theta_comp_lvl3(end) - theta_true_lvl3);
+
+% =========================================================================
+% 9. FIND DETECTED MISSING COUNT
+% =========================================================================
+miss_idx_lvl3 = ...
+    find(missing_count_lvl3 ~= 0, 1, 'first');
+
+if ~isempty(miss_idx_lvl3)
+    detected_missing_lvl3 = ...
+        missing_count_lvl3(miss_idx_lvl3);
+else
+    detected_missing_lvl3 = 0;
+end
+
+% =========================================================================
+% 10. REPORT
+% =========================================================================
+fprintf('\n');
+fprintf('[LEVEL 3] SINGLE DOUBLE-JUMP COMPENSATION TEST\n');
+fprintf('----------------------------------------------------------------------\n');
+
+fprintf('PPR                         : %d\n', PPR);
+fprintf('CPR (X4)                   : %d counts/rev\n', CPR);
+fprintf('Ground-truth counts        : %d\n', true_counts_lvl3);
+fprintf('Expected missing count     : +2\n');
+
+fprintf('----------------------------------------------------------------------\n');
+
+fprintf('| Metric                    | Value                |\n');
+fprintf('----------------------------------------------------------------------\n');
+
+fprintf('| True position             | %.9f rad      |\n', ...
+    theta_true_lvl3);
+
+fprintf('| Raw position              | %.9f rad      |\n', ...
+    theta_raw_lvl3(end));
+
+fprintf('| Compensated position      | %.9f rad      |\n', ...
+    theta_comp_lvl3(end));
+
+fprintf('| Raw position error        | %.3e rad      |\n', ...
+    err_raw_lvl3);
+
+fprintf('| Compensated position err. | %.3e rad      |\n', ...
+    err_comp_lvl3);
+
+fprintf('----------------------------------------------------------------------\n');
+
+if ~isempty(miss_idx_lvl3)
+
+    fprintf('Detected missing_count      : %d\n', ...
+        detected_missing_lvl3);
+
+else
+
+    fprintf('Detected missing_count      : NONE\n');
+
+end
+
+fprintf('----------------------------------------------------------------------\n');
+
+% =========================================================================
+% 11. PASS / FAIL
+% =========================================================================
+if detected_missing_lvl3 == 2 && err_comp_lvl3 < 1e-10
+
+    fprintf('=> LEVEL 3 STATUS: PASS\n');
+    fprintf('=> Double-jump detected and position compensation is correct.\n');
+
+else
+
+    fprintf('=> LEVEL 3 STATUS: FAIL\n');
+
+    if detected_missing_lvl3 ~= 2
+        fprintf('=> Expected missing_count = +2, detected = %d.\n', ...
+            detected_missing_lvl3);
+    end
+
+    if err_comp_lvl3 >= 1e-10
+        fprintf('=> Compensation residual error = %.3e rad.\n', ...
+            err_comp_lvl3);
+    end
+
+end
+
+fprintf('======================================================================\n');
+fprintf('\n');

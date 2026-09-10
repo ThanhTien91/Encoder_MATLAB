@@ -1,54 +1,102 @@
 function [A_sat, B_sat, total_missed] = inject_acquisition_saturation(A, B, Fs, params)
-% =====================================================================
-% SCRIPT: inject_acquisition_saturation.m
-% MỤC TIÊU: Mô phỏng giới hạn băng thông số (Bandwidth Saturation).
-% Cơ chế: Nếu khoảng thời gian giữa 2 sự kiện (cạnh A hoặc B) nhỏ hơn 
-% giới hạn chu kỳ phản hồi của phần cứng, sự kiện đó sẽ bị hệ thống bỏ qua.
-% =====================================================================
 
-% Kiểm tra Input
-assert(length(A) == length(B), 'Tín hiệu A và B phải có cùng chiều dài.');
+% =========================================================================
+% FUNCTION: inject_acquisition_saturation.m
+% MỤC TIÊU:
+%   Mô phỏng giới hạn băng thông của tầng acquisition phần cứng.
+%
+% CƠ CHẾ:
+%   Nếu khoảng thời gian giữa hai transition liên tiếp nhỏ hơn thời gian
+%   phần cứng cần để xử lý một event, transition mới sẽ bị bỏ qua.
+%
+% OUTPUT:
+%   A_sat          : tín hiệu A sau saturation
+%   B_sat          : tín hiệu B sau saturation
+%   total_missed   : số transition bị acquisition bỏ qua
+% =========================================================================
 
-% Lấy giới hạn tần số sự kiện từ config
+% =========================================================================
+% 1. INPUT VALIDATION
+% =========================================================================
+assert( ...
+    length(A) == length(B), ...
+    'Tín hiệu A và B phải có cùng chiều dài.');
+
+% =========================================================================
+% 2. BANDWIDTH CONFIGURATION
+% =========================================================================
 max_freq = params.hw.max_event_freq;
 
-% Số mẫu tối thiểu vi điều khiển cần để xử lý 1 sự kiện
+% Số sample tối thiểu giữa hai transition để phần cứng xử lý được
 min_samples_between_events = Fs / max_freq;
 
+% =========================================================================
+% 3. INITIALIZATION
+% =========================================================================
 N = length(A);
+
 A_sat = zeros(N, 1);
 B_sat = zeros(N, 1);
 
-% Khởi tạo trạng thái ban đầu
+% Trạng thái ban đầu
 A_sat(1) = A(1);
 B_sat(1) = B(1);
 
+% Index của transition gần nhất đã được chấp nhận
 last_event_idx = 1;
+
+% Số transition thực sự bị bỏ qua
 total_missed = 0;
 
-% Chạy State-Machine quét qua từng mẫu thời gian
+% =========================================================================
+% 4. ACQUISITION STATE MACHINE
+% =========================================================================
 for i = 2:N
-    % Phát hiện có sự thay đổi cạnh (Edge Transition)
-    if A(i) ~= A(i-1) || B(i) ~= B(i-1)
+
+    % -------------------------------------------------------------
+    % Kiểm tra có transition mới trên A hoặc B không
+    % -------------------------------------------------------------
+    is_transition = ...
+        (A(i) ~= A(i-1)) || ...
+        (B(i) ~= B(i-1));
+
+    if is_transition
+
+        % Khoảng thời gian kể từ transition được chấp nhận gần nhất
         delta_samples = i - last_event_idx;
 
-        % Kiểm tra băng thông
+        % ---------------------------------------------------------
+        % Event được chấp nhận
+        % ---------------------------------------------------------
         if delta_samples >= min_samples_between_events
-            % Hệ thống đủ thời gian phản hồi -> Chốt trạng thái mới
+
             A_sat(i) = A(i);
             B_sat(i) = B(i);
+
             last_event_idx = i;
+
+        % ---------------------------------------------------------
+        % Event bị drop do giới hạn bandwidth
+        % ---------------------------------------------------------
         else
-            % Bão hòa băng thông! Hệ thống không kịp phản hồi ngắt.
-            % -> Giữ nguyên trạng thái cũ (Bỏ lỡ sự kiện)
+
+            % Giữ nguyên trạng thái acquisition trước đó
             A_sat(i) = A_sat(i-1);
             B_sat(i) = B_sat(i-1);
+
+            % Chỉ đếm transition này là một missed transition
             total_missed = total_missed + 1;
+
         end
+
     else
-        % Không có sự kiện, duy trì trạng thái
+
+        % Không có transition:
+        % giữ nguyên trạng thái hiện tại
         A_sat(i) = A_sat(i-1);
         B_sat(i) = B_sat(i-1);
+
     end
 end
+
 end
