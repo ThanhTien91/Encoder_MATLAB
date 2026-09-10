@@ -1,0 +1,21 @@
+# MATLAB
+*.mat
+*.mex*
+*.slx
+*.fig
+*.log
+*.bak
+*~
+
+# OS / Editor temp
+.DS_Store
+Thumbs.db
+~$*
+*.tmp
+
+# Word/Office temp files
+~$*.docx
+~$*.doc
+
+# Test/debug scripts (optional - uncomment if you want to ignore)
+# main_day2_345.m

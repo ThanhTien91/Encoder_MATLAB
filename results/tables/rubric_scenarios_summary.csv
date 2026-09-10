@@ -3,4 +3,4 @@ S1_Nominal,"10 rad/s, 25C, No Noise",0.000760608137099686,Baseline
 S2_Low_Noise,"Edge jitter +-1 sample, bounce 5%",0.0126917092228047,Robustness
 S3_High_Noise,"Edge jitter +-2 sample, bounce 25%",0.0245807800303637,Stress test
 S4_Parameter_Deviation,Temp = 60C,0.125673802739953,Thermal Drift 0.18 rad
-S5_Hardware_Fault,Accel to 800 RPM,11.074309147021,Missed 618 events
+S5_Hardware_Fault,Accel to 800 RPM,10.6924467544008,Missed 1366 events

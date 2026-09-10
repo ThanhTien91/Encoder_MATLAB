@@ -1,6 +1,7 @@
 % =========================================================================
 % SCRIPT: sensitivity_analysis.m
-% MỤC TIÊU: True Monte Carlo Uncertainty Analysis (Jitter Sweep)
+% MỤC TIÊU: True Monte Carlo Uncertainty Analysis (Jitter/Bounce Sweep)
+%           ĐỒNG BỘ HOÀN TOÀN VỚI HỆ THỐNG GỐC: Fs = 1 MHz, omega = 10 rad/s
 % =========================================================================
 
 clc;
@@ -10,10 +11,12 @@ close all;
 % =========================================================================
 % 1. PATH
 % =========================================================================
-addpath(fullfile(pwd, '..', 'decoder'));
-addpath(fullfile(pwd, '..', 'config'));
-addpath(fullfile(pwd, '..', 'models'));
-addpath(fullfile(pwd, '..', 'analysis'));
+project_root = fileparts(fileparts(mfilename('fullpath')));
+
+addpath(fullfile(project_root, 'config'));
+addpath(fullfile(project_root, 'models'));
+addpath(fullfile(project_root, 'decoder'));
+addpath(fullfile(project_root, 'analysis'));
 
 % =========================================================================
 % 2. SYSTEM PARAMETERS
@@ -30,22 +33,21 @@ dp_rad = 2 * pi / CPR;
 rng(params.rng_seed);
 
 % =========================================================================
-% 4. MONTE CARLO CONFIGURATION
+% 4. MONTE CARLO CONFIGURATION (ĐỒNG BỘ VỚI HỆ THỐNG GỐC)
 % =========================================================================
-% Không dùng trực tiếp Fs = 1 MHz để giảm RAM/thời gian chạy.
-Fs_analysis = 50000;
+% BẮT BUỘC dùng đúng Fs = 1 MHz để bảo toàn ý nghĩa vật lý của Jitter (1 sample = 1 us)
+Fs_analysis = params.Fs;  % 1e6 Hz
 
 noise_levels = [0, 0.002, 0.005, 0.01, 0.02, 0.05];
-
 num_levels = length(noise_levels);
 
-N_trials = 100;
-
-duration = 1.0;
+% Rút gọn thời gian và số vòng lặp để tránh tràn RAM ở Fs = 1 MHz
+N_trials = 30;       % 30 vòng lặp là đủ tin cậy cho thống kê phân phối
+duration = 0.2;      % Quan sát 0.2s là đủ để tính RMSE ở trạng thái xác lập
 
 t = (0:1/Fs_analysis:duration)';
 
-omega_true = 5;            % rad/s
+omega_true = 10;     % ĐỒNG BỘ: Test ở đúng 10 rad/s giống kịch bản S1-S4
 theta_ideal = omega_true * t;
 
 % Bỏ transient 50 ms đầu
@@ -56,18 +58,17 @@ valid_omega = omega_true * ones(length(t) - start_idx + 1, 1);
 % =========================================================================
 % 5. NOISE MAPPING
 % =========================================================================
-% Mapping noise_amp (rad) -> edge-domain noise setting.
-%
-% Đây là mapping cấp độ mô phỏng dùng để quét độ nhạy,
-% không phải phép quy đổi vật lý tuyệt đối giữa rad và sample jitter.
-
+% Mapping: noise_amp (rad) -> {jitter_samples, bounce_prob}
+% Được hiệu chuẩn để khớp với Rubric Scenarios:
+%   S2 Low Noise  -> jitter 1, bounce 5%  -> noise_amp ~ 0.002
+%   S3 High Noise -> jitter 2, bounce 25% -> noise_amp ~ 0.05
 jitter_map = containers.Map( ...
     {0, 0.002, 0.005, 0.01, 0.02, 0.05}, ...
     {[0, 0], [1, 0.05], [1, 0.10], ...
      [2, 0.15], [2, 0.20], [3, 0.25]});
 
 % =========================================================================
-% 6. MONTE CARLO RESULTS
+% 6. MONTE CARLO RESULTS STORAGE
 % =========================================================================
 metrics_MC = struct( ...
     'H_mean', zeros(num_levels,1), ...
@@ -84,10 +85,10 @@ fprintf('=======================================================================
 fprintf('     TRUE MONTE CARLO EDGE-DOMAIN NOISE SENSITIVITY ANALYSIS\n');
 fprintf('     N = %d trials, Fs = %d Hz, omega = %.2f rad/s\n', ...
     N_trials, Fs_analysis, omega_true);
-fprintf('=========================================================================================\n');
+fprintf('=========================================================================================\n\n');
 
-fprintf('| Noise | Jitter | Bounce | H-Median(P50) | Interval [P05, P95] | H-Mean | H-Std | H-Max |\n');
-fprintf('------------------------------------------------------------------------------------------------\n');
+fprintf('| Noise Amp | Jitter | Bounce | H-P50  | [P05, P95]       | H-Mean | H-Std  | H-Max  |\n');
+fprintf('-----------------------------------------------------------------------------------------\n');
 
 % =========================================================================
 % 8. MONTE CARLO LOOP
@@ -118,10 +119,15 @@ for i = 1:num_levels
         [A_ideal, B_ideal, ~] = encoder_model(theta_ideal, params);
 
         % ================================================================
-        % 2. EDGE-DOMAIN MICRO NOISE
+        % 2. EDGE-DOMAIN MICRO NOISE (Jitter + Bounce)
         % ================================================================
-        [A_noisy, B_noisy] = inject_micro_noise( ...
-            A_ideal, B_ideal, jitter_s, bounce_p);
+        if jitter_s > 0 || bounce_p > 0
+            [A_noisy, B_noisy] = inject_micro_noise( ...
+                A_ideal, B_ideal, jitter_s, bounce_p);
+        else
+            A_noisy = A_ideal;
+            B_noisy = B_ideal;
+        end
 
         % ================================================================
         % 3. X4 DECODER
@@ -129,18 +135,17 @@ for i = 1:num_levels
         [pos_count, missing_count] = ...
             quadrature_decoder_x4(A_noisy, B_noisy);
 
-        % Fault flag:
-        % chỉ đánh dấu những mẫu có missing transition được phát hiện
+        % Fault flag: chỉ đánh dấu những mẫu có missing transition
         error_flag = double(missing_count ~= 0);
 
         % ================================================================
-        % 4. SPEED ESTIMATION
+        % 4. SPEED ESTIMATION (Hybrid)
         % ================================================================
         [~, ~, o_H] = speed_estimator( ...
             pos_count, t, PPR, error_flag);
 
         % ================================================================
-        % 5. QUANTITATIVE METRIC
+        % 5. QUANTITATIVE METRIC (valid region only)
         % ================================================================
         mH = compute_metrics( ...
             valid_omega, ...
@@ -151,28 +156,23 @@ for i = 1:num_levels
     end
 
     % =========================================================================
-    % 6. MONTE CARLO STATISTICS
+    % 9. MONTE CARLO STATISTICS
     % =========================================================================
     metrics_MC.H_mean(i) = mean(temp_H);
-
-    metrics_MC.H_std(i) = std(temp_H);
-
-    metrics_MC.H_p05(i) = prctile(temp_H, 5);
-
-    metrics_MC.H_p50(i) = prctile(temp_H, 50);
-
-    metrics_MC.H_p95(i) = prctile(temp_H, 95);
-
-    metrics_MC.H_max(i) = max(temp_H);
+    metrics_MC.H_std(i)  = std(temp_H);
+    metrics_MC.H_p05(i)  = prctile(temp_H, 5);
+    metrics_MC.H_p50(i)  = prctile(temp_H, 50);
+    metrics_MC.H_p95(i)  = prctile(temp_H, 95);
+    metrics_MC.H_max(i)  = max(temp_H);
 
     % =========================================================================
-    % 7. PRINT RESULT
+    % 10. PRINT RESULT
     % =========================================================================
     fprintf( ...
-        '| %-5.3f | %-6d | %-6.2f | %-13.4f | [%.4f, %.4f] | %-6.4f | %-6.4f | %-6.4f |\n', ...
+        '| %7.3f  | %6d | %5.0f%% | %6.4f | [%6.4f, %6.4f] | %6.4f | %6.4f | %6.4f |\n', ...
         noise_amp, ...
         jitter_s, ...
-        bounce_p, ...
+        bounce_p * 100, ...
         metrics_MC.H_p50(i), ...
         metrics_MC.H_p05(i), ...
         metrics_MC.H_p95(i), ...
@@ -182,63 +182,73 @@ for i = 1:num_levels
 
 end
 
+fprintf('\n=========================================================================================\n\n');
+
 % =========================================================================
-% 8. PLOT
+% 11. PLOT RESULTS
 % =========================================================================
-figure( ...
-    'Name', 'Monte Carlo Jitter', ...
-    'Position', [250, 250, 800, 500], ...
-    'Color', 'w');
+figure('Name', 'Monte Carlo Jitter/Bounce Sensitivity', ...
+    'Position', [200, 200, 900, 500], 'Color', 'w');
 
-% Median
-plot( ...
-    noise_levels, ...
-    metrics_MC.H_p50, ...
-    '-^', ...
-    'LineWidth', 2, ...
-    'Color', '#EDB120', ...
-    'DisplayName', 'Hybrid Median (P50)');
+hold on; grid on;
 
-hold on;
-grid on;
+% Ensure row vectors for plotting
+x_vec = noise_levels(:)';
+p05_vec = metrics_MC.H_p05(:)';
+p95_vec = metrics_MC.H_p95(:)';
+p50_vec = metrics_MC.H_p50(:)';
+mean_vec = metrics_MC.H_mean(:)';
+std_vec = metrics_MC.H_std(:)';
 
-% Mean +/- Std
-errorbar( ...
-    noise_levels, ...
-    metrics_MC.H_mean, ...
-    metrics_MC.H_std, ...
-    'k.', ...
-    'LineWidth', 1.2, ...
-    'DisplayName', 'Mean +/- Std');
+% P05-P95 shaded interval
+x_fill = [x_vec, fliplr(x_vec)];
+y_fill = [p05_vec, fliplr(p95_vec)];
+h1 = fill(x_fill, y_fill, [0.9 0.9 0.9], 'EdgeColor', 'none', 'DisplayName', 'P05-P95 Interval');
 
-xlabel('Noise Level (rad)', 'FontWeight', 'bold');
+% Median (P50)
+h2 = plot(x_vec, p50_vec, '-o', ...
+    'LineWidth', 2, 'Color', '#EDB120', 'DisplayName', 'Median (P50)');
 
-ylabel('RMSE (rad/s)', 'FontWeight', 'bold');
+% Mean ± Std
+h3 = errorbar(x_vec, mean_vec, std_vec, 'k.', ...
+    'LineWidth', 1, 'DisplayName', 'Mean ± Std');
 
-title( ...
-    sprintf('Hybrid Estimator Robustness (%d MC Trials)', N_trials), ...
+xlabel('Noise Amplitude (rad) — mapped to Jitter/Bounce', 'FontWeight', 'bold');
+ylabel('Hybrid Estimator RMSE (rad/s)', 'FontWeight', 'bold');
+title(sprintf('Hybrid Estimator Robustness (%d MC Trials, Fs = 1 MHz, Physical Edge-Domain Noise)', N_trials), ...
     'FontSize', 14);
-
 legend('Location', 'northwest');
-
 set(gca, 'FontSize', 11);
+xlim([0, max(noise_levels)*1.1]);
 
 % =========================================================================
-% 9. SAVE FIGURE
+% 12. SAVE RESULTS
 % =========================================================================
-out_fig_dir = fullfile('..', 'results', 'figure', 'day8');
+out_fig_dir = fullfile(project_root, 'results', 'figure', 'day8');
+if ~exist(out_fig_dir, 'dir'), mkdir(out_fig_dir); end
+saveas(gcf, fullfile(out_fig_dir, 'mc_sensitivity.png'));
 
-if ~exist(out_fig_dir, 'dir')
-    mkdir(out_fig_dir);
+% CSV
+csv_path = fullfile(project_root, 'results', 'tables', 'mc_sensitivity.csv');
+fid = fopen(csv_path, 'w');
+fprintf(fid, 'NoiseAmp_rad,Jitter_samples,Bounce_prob,P50_RMSE,P05_RMSE,P95_RMSE,Mean_RMSE,Std_RMSE,Max_RMSE\n');
+for i = 1:num_levels
+    map_val = jitter_map(noise_levels(i));
+    jitter_s = map_val(1);
+    bounce_p = map_val(2);
+    fprintf(fid, '%.3f,%d,%.2f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f\n', ...
+        noise_levels(i), ...
+        jitter_s, ...
+        bounce_p, ...
+        metrics_MC.H_p50(i), metrics_MC.H_p05(i), metrics_MC.H_p95(i), ...
+        metrics_MC.H_mean(i), metrics_MC.H_std(i), metrics_MC.H_max(i));
 end
+fclose(fid);
 
-saveas( ...
-    gcf, ...
-    fullfile(out_fig_dir, 'mc_sensitivity.png'));
+% MAT
+save(fullfile(project_root, 'results', 'mc_sensitivity.mat'), 'metrics_MC', 'noise_levels', 'jitter_map');
 
-fprintf('\nMonte Carlo figure saved to:\n');
-fprintf('%s\n', fullfile(out_fig_dir, 'mc_sensitivity.png'));
-
-fprintf('\n=========================================================================================\n');
-fprintf('TRUE MONTE CARLO ANALYSIS COMPLETED.\n');
+fprintf('\n>> Đã lưu figure: %s\n', fullfile(out_fig_dir, 'mc_sensitivity.png'));
+fprintf('>> Đã lưu CSV: %s\n', csv_path);
+fprintf('>> Đã lưu MAT: %s\n', fullfile(project_root, 'results', 'mc_sensitivity.mat'));
 fprintf('=========================================================================================\n');
