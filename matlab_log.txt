@@ -1,0 +1,5 @@
+ 
+To get started, type doc.
+For product information, visit www.mathworks.com.
+ 
+hello
