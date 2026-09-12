@@ -42,7 +42,7 @@ noise_levels = [0, 0.002, 0.005, 0.01, 0.02, 0.05];
 num_levels = length(noise_levels);
 
 % Rút gọn thời gian và số vòng lặp để tránh tràn RAM ở Fs = 1 MHz
-N_trials = 30;       % 30 vòng lặp là đủ tin cậy cho thống kê phân phối
+N_trials = 100;      % 100 vòng lặp Monte Carlo cho mỗi mức nhiễu (khớp báo cáo)
 duration = 0.2;      % Quan sát 0.2s là đủ để tính RMSE ở trạng thái xác lập
 
 t = (0:1/Fs_analysis:duration)';
