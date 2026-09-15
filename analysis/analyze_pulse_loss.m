@@ -1,7 +1,14 @@
-% =========================================================================
-% SCRIPT: analyze_pulse_loss.m
-% MỤC TIÊU: Đánh giá xác suất rớt xung với Monte Carlo (N=50 trials)
-% =========================================================================
+% ==========================================================================
+% FILE: analyze_pulse_loss.m
+% MODULE: Pulse Loss Monte Carlo Analysis
+% DESCRIPTION: Evaluates position compensator efficiency across pulse
+%              loss rates (0-2%) with N=50 Monte Carlo trials per level.
+% ==========================================================================
+
+%% ==========================================================================
+% 1. ENVIRONMENT SETUP
+% ==========================================================================
+
 clc; clear; close all;
 addpath(fullfile(pwd, '..', 'decoder'));
 addpath(fullfile(pwd, '..', 'config'));
@@ -9,17 +16,21 @@ addpath(fullfile(pwd, '..', 'config'));
 params = default_params();
 PPR = params.PPR; CPR = PPR * 4; dp_rad = 2 * pi / CPR;
 
-rng(params.rng_seed); % Đảm bảo tính lặp lại
+rng(params.rng_seed);
 
-loss_list = [0, 0.1, 0.5, 1.0, 1.5, 2.0]; 
-N_pulses = 10000; 
-N_trials = 50; % Số lượng thử nghiệm MC
+loss_list = [0, 0.1, 0.5, 1.0, 1.5, 2.0];
+N_pulses = 10000;
+N_trials = 50;
 
 fprintf('=========================================================================\n');
-fprintf('    PULSE LOSS MONTE CARLO ANALYSIS (N = %d trials) \n', N_trials);
+fprintf('    PULSE LOSS MONTE CARLO ANALYSIS (N = %d trials)\n', N_trials);
 fprintf('=========================================================================\n');
 fprintf('| Loss(%%) | RMSE OFF (Mean) | RMSE ON (Mean) | Improvement(%%) | Max Err(ON)|\n');
 fprintf('-------------------------------------------------------------------------\n');
+
+%% ==========================================================================
+% 2. MONTE CARLO LOOP
+% ==========================================================================
 
 for i = 1:length(loss_list)
     loss_rate = loss_list(i) / 100;
@@ -29,19 +40,21 @@ for i = 1:length(loss_list)
     temp_max_on   = zeros(N_trials, 1);
     
     for k = 1:N_trials
+        % Ideal State Sequence
         seq = [0, 2, 3, 1];
         states = seq(mod(0:N_pulses-1, 4) + 1);
         
-        % Tiêm lỗi
+        % Fault Injection
         fault_idx = rand(1, N_pulses) < loss_rate;
         states_faulty = states;
         for j = 2:N_pulses
             if fault_idx(j)
-                states_faulty(j) = seq(mod(j-1+1, 4) + 1); % Double jump
+                states_faulty(j) = seq(mod(j-1+1, 4) + 1);  % Double Jump
             end
         end
         
-        A_in = floor(states_faulty / 2); B_in = mod(states_faulty, 2);
+        A_in = floor(states_faulty / 2); 
+        B_in = mod(states_faulty, 2);
         [pos_count, missing_count] = quadrature_decoder_x4(A_in, B_in);
         
         theta_true = (0:N_pulses-1)' * dp_rad;
@@ -56,10 +69,10 @@ for i = 1:length(loss_list)
         temp_max_on(k)   = m_on.max_error;
     end
     
-    % Trung bình thống kê
+    % Statistics
     mean_off = mean(temp_rmse_off);
     mean_on  = mean(temp_rmse_on);
-    max_on   = max(temp_max_on); % Worst-case max error
+    max_on   = max(temp_max_on);
     
     if mean_off > 0
         improvement = ((mean_off - mean_on) / mean_off) * 100;

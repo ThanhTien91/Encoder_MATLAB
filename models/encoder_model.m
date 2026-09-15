@@ -1,44 +1,52 @@
+% ==========================================================================
+% FILE: encoder_model.m
+% MODULE: Quadrature Encoder Signal Generation
+% DESCRIPTION: Generates ideal A/B/Z quadrature signals from angular
+%              position with optional thermal phase drift.
+% ==========================================================================
+
 function [A, B, Z] = encoder_model(theta, params, phase_offset)
 
-% Tương thích ngược: Nếu kịch bản cũ không truyền phase_offset, mặc định bằng 0
+% ==========================================================================
+% 1. BACKWARD COMPATIBILITY
+% ==========================================================================
+
 if nargin < 3
     phase_offset = 0;
 end
 
-% ==============================
-% ENCODER PARAMETERS
-% ==============================
+% ==========================================================================
+% 2. ENCODER PARAMETERS
+% ==========================================================================
 
 N = params.PPR;
 
-% ==============================
-% QUADRATURE CHANNEL A/B
-% ==============================
+% ==========================================================================
+% 3. QUADRATURE CHANNELS A/B GENERATION
+% ==========================================================================
 
-% Electrical phase
+% --- Electrical Phase ---
 phase = N * theta;
-
-% Convert phase to 0 -> 2*pi
 phase_mod = mod(phase, 2*pi);
 
-% Channel A: 50% duty cycle
+% --- Channel A: 50% Duty Cycle ---
 A = phase_mod < pi;
 
-% Channel B: shifted by 90 electrical degrees + thermal phase drift
-% Đã cấu trúc lại để an toàn với hàm mod() khi phase_offset bị âm/dương
+% --- Channel B: 90 deg Electrical Shift + Thermal Drift ---
 phase_B_mod = mod(phase - pi/2 - phase_offset, 2*pi);
 B = phase_B_mod < pi;
 
-% ==============================
-% INDEX CHANNEL Z
-% ==============================
+% ==========================================================================
+% 4. INDEX CHANNEL Z GENERATION
+% ==========================================================================
 
-% Mechanical angle within one revolution
+% --- Mechanical Angle (Single Revolution) ---
 theta_mod = mod(theta, 2*pi);
 
-% Index pulse width
+% --- Index Pulse Width (1 X4 Count) ---
 pulse_width_rad = (2*pi) / (N*4);
 
+% --- Z Active at Mechanical Zero ---
 Z = theta_mod < pulse_width_rad;
 
 end
